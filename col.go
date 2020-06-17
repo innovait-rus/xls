@@ -169,8 +169,30 @@ type NumberCol struct {
 
 func (c *NumberCol) String(wb *WorkBook) []string {
 	if fNo := wb.Xfs[c.Index].formatNo(); fNo != 0 {
-		t := timeFromExcelTime(c.Float, wb.dateMode == 1)
-		return []string{yymmdd.Format(t, wb.Formats[fNo].str)}
+		if fNo >= 164 { // user defined format
+			if formatter := wb.Formats[fNo]; formatter != nil {
+				formatterLower := strings.ToLower(formatter.str)
+				if formatterLower == "general" ||
+					strings.Contains(formatter.str, "#") ||
+					strings.Contains(formatter.str, ".00") ||
+					strings.Contains(formatterLower, "m/y") ||
+					strings.Contains(formatterLower, "d/y") ||
+					strings.Contains(formatterLower, "m.y") ||
+					strings.Contains(formatterLower, "d.y") ||
+					strings.Contains(formatterLower, "h:") ||
+					strings.Contains(formatterLower, "д.г") {
+					//If format contains # or .00 then this is a number
+					return []string{fmt.Sprintf("%f", c.Float)}
+				} else {
+					t := timeFromExcelTime(c.Float, wb.dateMode == 1)
+					return []string{yymmdd.Format(t, wb.Formats[fNo].str)}
+				}
+			}
+			// see http://www.openoffice.org/sc/excelfileformat.pdf Page #174
+		} else if 14 <= fNo && fNo <= 17 || fNo == 22 || 27 <= fNo && fNo <= 36 || 50 <= fNo && fNo <= 58 { // jp. date format
+			t := timeFromExcelTime(c.Float, wb.dateMode == 1)
+			return []string{t.Format(time.RFC3339)}
+		}
 	}
 	return []string{strconv.FormatFloat(c.Float, 'f', -1, 64)}
 }
